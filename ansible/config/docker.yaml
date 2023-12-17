@@ -1,0 +1,43 @@
+- name: Установка необходимых пакетов для Docker
+  apt:  # Использование модуля 'apt' для управления пакетами в системах на базе Debian/Ubuntu
+    name:  # Список пакетов для установки
+      - apt-transport-https  # Пакет для использования 'https' в источниках APT
+      - ca-certificates  # Позволяет проверку SSL-сертификатов
+      - curl  # Инструмент для передачи данных с поддержкой различных протоколов
+      - software-properties-common  # Пакет для управления репозиториями и расширенными свойствами пакетов
+    update_cache: yes  # Обновление кеша APT перед установкой пакетов
+
+- name: Добавление GPG ключа Docker
+  apt_key:  # Модуль для добавления или удаления ключей APT
+    url: https://download.docker.com/linux/ubuntu/gpg  # URL, откуда будет загружен GPG ключ
+    state: present  # Указывает, что ключ должен присутствовать
+
+- name: Добавление репозитория Docker
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Установка Docker
+  apt:  # Снова использование модуля 'apt' для установки Docker
+    name: docker-ce  # Имя пакета Docker
+    update_cache: yes  # Обновление кеша APT перед установкой
+    state: latest  # Указывает на установку последней версии пакета
+
+- name: Установка Docker Compose
+  shell: |
+    curl -L "https://github.com/docker/compose/releases/download/1.25.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose
+  args:
+    executable: /bin/bash
+
+- name: Добавление текущего пользователя в группу docker
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Перезапуск демона Docker для применения изменений
+  systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes

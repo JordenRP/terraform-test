@@ -1,0 +1,38 @@
+- name: Установка netstat
+  apt:
+    name:
+      - net-tools
+    update_cache: yes
+
+- name: Установка Git (если еще не установлен)
+  apt:
+    name: git
+    state: present
+
+- name: Установка unzip (если еще не установлен)
+  apt:
+    name: unzip
+    state: present
+
+- name: Установка Rclone
+  become: yes
+  shell: |
+    curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip &&
+    unzip rclone-current-linux-amd64.zip &&
+    cd rclone-*-linux-amd64 &&
+    cp rclone /usr/bin/ &&
+    chown root:root /usr/bin/rclone &&
+    chmod 755 /usr/bin/rclone
+
+- name: Копирование конфигурационного файла Rclone
+  become: yes
+  copy:
+    src: /home/pavel/.config/rclone/rclone.conf
+    dest: /root/.config/rclone/rclone.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Авторизация Rclone
+  become: yes
+  command: rclone authorize "yandex"

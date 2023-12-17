@@ -1,0 +1,35 @@
+- name: Копирование приватного ключа SSH для GitHub
+  copy:
+    src: /home/pavel/.ssh/key5
+    dest: /home/{{ ansible_user }}/.ssh/key5
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Копирование приватного ключа SSH для GitHub
+  copy:
+    src: /home/pavel/.ssh/config
+    dest: /home/{{ ansible_user }}/.ssh/config
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Клонирование репозитория taiga
+  become: no
+  git:
+    repo: 'git@github.com-taiga:JordenRP/taiga.git'
+    dest: /home/{{ ansible_user }}/taiga
+    version: main  # Или другая ветка/тег
+    accept_hostkey: true
+
+- name: Запуск Docker Compose в taiga
+  become: yes
+  template:
+    src: ../setting/.env.taiga
+    dest: /home/{{ ansible_user }}/taiga/.env
+
+- name: Запуск Docker Compose в taiga
+  shell: ./launch-taiga.sh
+  args:
+    chdir: /home/{{ ansible_user }}/taiga
+    executable: /bin/bash

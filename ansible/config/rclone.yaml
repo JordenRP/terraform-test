@@ -1,0 +1,3 @@
+- name: Синхронизация папки с Rclone
+  become: yes
+  command: rclone sync -vv /var/lib/docker/volumes/taiga_nfs yandex:backup/taiga

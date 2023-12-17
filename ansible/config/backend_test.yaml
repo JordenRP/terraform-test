@@ -1,0 +1,42 @@
+- name: Копирование приватного ключа SSH для GitHub
+  copy:
+    src: /home/pavel/.ssh/key3
+    dest: /home/{{ ansible_user }}/.ssh/key3
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Копирование приватного ключа SSH для GitHub
+  copy:
+    src: /home/pavel/.ssh/config
+    dest: /home/{{ ansible_user }}/.ssh/config
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Клонирование репозитория
+  become: no
+  git:
+    repo: 'git@github.com-back:JordenRP/backend-test.git'
+    dest: /home/{{ ansible_user }}/backend-test
+    version: master  # Или другая ветка/тег
+    accept_hostkey: true
+
+- name: Запуск Docker Compose в backend-test
+  shell: docker compose up -d
+  args:
+    chdir: /home/{{ ansible_user }}/backend-test
+    executable: /bin/bash
+
+- name: Установка зависимостей
+  tags: composer
+  command: docker exec -t -u root backend-test-php-1 sh -c "composer install"
+
+- name: Пауза 10 секунд
+  pause:
+    seconds: 30
+
+- name: Выполнение миграций
+  tags: migration
+  command: docker exec -t backend-test-php-1 sh -c "bin/console d:m:m --no-interaction"
+

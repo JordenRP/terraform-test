@@ -53,6 +53,6 @@ resource "yandex_compute_instance" "default" {
 
   provisioner "local-exec" {
       when    = create
-      command = "sleep 60 && echo ${self.network_interface.0.nat_ip_address} > public_ip.txt && ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u ${var.user} -i '${self.network_interface.0.nat_ip_address},' --private-key ~/.ssh/id_rsa ansible/playbook.yml"
+      command = "echo ${self.network_interface.0.nat_ip_address} > public_ip.txt && ./wait_for.sh ${var.user} ${self.network_interface.0.nat_ip_address}"
   }
 }
