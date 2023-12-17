@@ -7,6 +7,11 @@ terraform {
   required_version = ">= 0.13"
 }
 
+variable "user" {
+  type        = string
+  default     = "pavel"
+}
+
 provider "yandex" {
   service_account_key_file = "/home/pavel/infra/teraform/key.json"
   folder_id		   = "b1gmhu9tc3bld5appt8p"
@@ -25,8 +30,8 @@ resource "yandex_compute_instance" "default" {
 
   resources {
     cores         = 2
-    memory        = 2
-    core_fraction = 20
+    memory        = 4
+    core_fraction = 100
   }
 
   boot_disk {
@@ -42,6 +47,12 @@ resource "yandex_compute_instance" "default" {
   }
 
   metadata = {
-    ssh-keys = "ubuntu:${file("~/.ssh/id_rsa.pub")}"
+      user-data = "${file("meta.txt")}"
+      ssh-keys = "pavel:${file("~/.ssh/id_rsa.pub")}"
+  }
+
+  provisioner "local-exec" {
+      when    = create
+      command = "sleep 60 && echo ${self.network_interface.0.nat_ip_address} > public_ip.txt && ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u ${var.user} -i '${self.network_interface.0.nat_ip_address},' --private-key ~/.ssh/id_rsa ansible/playbook.yml"
   }
 }

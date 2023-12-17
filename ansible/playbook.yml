@@ -1,0 +1,169 @@
+- name: Установка Docker на сервере
+  hosts: all  # Указывает на то, что Playbook будет запускаться на всех хостах, указанных в файле инвентаря
+  tags: docker
+  become: yes  # Повышение привилегий для выполнения задач с правами администратора (аналог sudo)
+
+  tasks:  # Начало списка задач
+    - name: Установка необходимых пакетов для Docker
+      apt:  # Использование модуля 'apt' для управления пакетами в системах на базе Debian/Ubuntu
+        name:  # Список пакетов для установки
+          - apt-transport-https  # Пакет для использования 'https' в источниках APT
+          - ca-certificates  # Позволяет проверку SSL-сертификатов
+          - curl  # Инструмент для передачи данных с поддержкой различных протоколов
+          - software-properties-common  # Пакет для управления репозиториями и расширенными свойствами пакетов
+        update_cache: yes  # Обновление кеша APT перед установкой пакетов
+
+    - name: install pip3
+      apt: name=python3-pip state=present
+
+    - name: Install Docker SDK for Python
+      pip:
+        name: "docker<5"
+      become: yes
+
+    - name: Добавление GPG ключа Docker
+      apt_key:  # Модуль для добавления или удаления ключей APT
+        url: https://download.docker.com/linux/ubuntu/gpg  # URL, откуда будет загружен GPG ключ
+        state: present  # Указывает, что ключ должен присутствовать
+
+    - name: Добавление репозитория Docker
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Установка Docker
+      apt:  # Снова использование модуля 'apt' для установки Docker
+        name: docker-ce  # Имя пакета Docker
+        update_cache: yes  # Обновление кеша APT перед установкой
+        state: latest  # Указывает на установку последней версии пакета
+
+    - name: Установка Docker Compose
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/download/1.25.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
+        chmod +x /usr/local/bin/docker-compose
+      args:
+        executable: /bin/bash
+
+    - name: Добавление текущего пользователя в группу docker
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Перезапуск демона Docker для применения изменений
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+# почему local
+#- name: Установка pip (если требуется)
+#  hosts: localhost
+#  connection: local
+#  gather_facts: yes
+#  become: yes
+#  tasks:
+#    - name: Установка pip
+#      apt:
+#        name: python3-pip
+#        state: present
+#      when: ansible_distribution == 'Ubuntu'
+#
+#    - name: Установка Docker SDK для Python
+#      pip:
+#        name: docker
+
+- name: Установка netstat
+  hosts: all
+  tags: netstat
+  become: yes
+
+  tasks:
+    - name: Установка netstat
+      apt:
+        name:
+          - net-tools
+        update_cache: yes
+
+- name: Клонирование репозитория из GitHub
+  hosts: all
+  become: yes
+  tasks:
+    - name: Установка Git (если еще не установлен)
+      apt:
+        name: git
+        state: present
+
+    - name: Копирование приватного ключа SSH для GitHub
+      copy:
+        src: /home/pavel/.ssh/key3
+        dest: /home/{{ ansible_user }}/.ssh/key3
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+    - name: Копирование приватного ключа SSH для GitHub
+      copy:
+        src: /home/pavel/.ssh/key5
+        dest: /home/{{ ansible_user }}/.ssh/key5
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+    - name: Копирование приватного ключа SSH для GitHub
+      copy:
+        src: /home/pavel/.ssh/config
+        dest: /home/{{ ansible_user }}/.ssh/config
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+- name: Клонирование репозитория из GitHub 2
+  hosts: all
+  tasks:
+    - name: Клонирование репозитория
+      git:
+        repo: 'git@github.com-back:JordenRP/backend-test.git'
+        dest: /home/{{ ansible_user }}/backend-test
+        version: master  # Или другая ветка/тег
+        accept_hostkey: true
+    - name: Клонирование репозитория taiga
+      git:
+        repo: 'git@github.com-taiga:JordenRP/taiga.git'
+        dest: /home/{{ ansible_user }}/taiga
+        version: main  # Или другая ветка/тег
+        accept_hostkey: true
+
+- name: Запуск Docker Compose для репозитория backend-test
+  hosts: all
+  become: yes
+  tasks:
+    - name: Запуск Docker Compose в backend-test
+      shell: docker compose up -d
+      args:
+        chdir: /home/{{ ansible_user }}/backend-test
+        executable: /bin/bash
+
+    - name: Запуск Docker Compose в taiga
+      become: yes
+      template:
+        src: setting/.env.taiga
+        dest: /home/{{ ansible_user }}/taiga/.env
+
+    - name: Запуск Docker Compose в taiga
+      shell: ./launch-taiga.sh
+      args:
+        chdir: /home/{{ ansible_user }}/taiga
+        executable: /bin/bash
+
+    - name: Установка зависимостей
+      tags: composer
+      command: docker exec -t -u root backend-test-php-1 sh -c "composer install"
+
+    - name: Выполнение миграций
+      tags: migration
+      command: docker exec -t backend-test-php-1 sh -c "bin/console d:m:m --no-interaction"
+
+#    - name: Debug
+#      tags: debug
+#      debug:
+#        msg: "test {{ ansible_host }}"
